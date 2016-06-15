@@ -1,0 +1,4 @@
+LIBRARY   gateway
+EXPORTS
+	SetDeviceToOpen @1
+    GetDeviceToOpen @2

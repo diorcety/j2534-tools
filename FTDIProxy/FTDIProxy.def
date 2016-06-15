@@ -1,0 +1,30 @@
+LIBRARY   ftd2xx
+EXPORTS
+	FT_Open @1
+	FT_OpenEx @27
+	FT_ListDevices @28
+	FT_Close @2
+	FT_Write @4
+	FT_Read @3
+	FT_IoCtl @5
+	FT_SetBaudRate @7
+	FT_SetDivisor @26
+	FT_SetDataCharacteristics  @8
+	FT_SetFlowControl @9
+	FT_ResetDevice @6
+	FT_SetDtr @10
+	FT_ClrDtr @11
+	FT_SetRts @12
+	FT_ClrRts @13
+	FT_GetModemStatus @14
+	FT_SetChars @15
+	FT_Purge @16
+	FT_SetTimeouts @17
+	FT_GetQueueStatus @18
+	FT_SetEventNotification @19
+	FT_GetEventStatus @20
+	FT_GetStatus @21
+	FT_SetBreakOn @22
+	FT_SetBreakOff @23
+	FT_SetWaitMask @24
+	FT_WaitOnMask @25
