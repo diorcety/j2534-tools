@@ -3,11 +3,13 @@
 #ifndef _INTERNAL_H_H
 #define _INTERNAL_H_H
 
-#include "ISO15765Proxy.h"
-
-#include <exception>
-#include <list>
+#include "j2534_v0404.h"
 #include <memory>
+
+class PeriodicMessage;
+
+typedef std::shared_ptr <PeriodicMessage> PeriodicMessagePtr;
+typedef std::weak_ptr <PeriodicMessage> PeriodicMessageWeakPtr;
 
 class MessageFilter;
 
@@ -29,17 +31,13 @@ class Library;
 typedef std::shared_ptr <Library> LibraryPtr;
 typedef std::weak_ptr <Library> LibraryWeakPtr;
 
-
-class J2534Exception : public std::exception {
+class Configuration {
 public:
-    J2534Exception(long code);
+	virtual ~Configuration();
 
-    long code() const;
+	virtual bool getValue(unsigned long config, unsigned long *value) const = 0;
 
-    virtual const char *what() const noexcept;
-
-private:
-    long mCode;
+	virtual bool setValue(unsigned long config, unsigned long value) = 0;
 };
 
 class Library : public std::enable_shared_from_this<Library> {
@@ -78,12 +76,11 @@ public:
 
     virtual void writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) = 0;
 
-    virtual unsigned long startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) = 0;
+    virtual PeriodicMessagePtr startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) = 0;
 
-    virtual void stopPeriodicMsg(unsigned long periodicMessage) = 0;
+    virtual void stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) = 0;
 
-    virtual MessageFilterPtr startMsgFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg,
-                                         PASSTHRU_MSG *pFlowControlMsg) = 0;
+    virtual MessageFilterPtr startMsgFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg) = 0;
 
     virtual void stopMsgFilter(const MessageFilterPtr &messageFilter) = 0;
 
@@ -99,8 +96,11 @@ public:
     virtual ChannelWeakPtr getChannel() const = 0;
 };
 
-void create_library(j2534_fcts *proxy);
-
-void delete_library();
+class PeriodicMessage : public std::enable_shared_from_this<PeriodicMessage> {
+public:
+    virtual ~PeriodicMessage() = 0;
+	
+    virtual ChannelWeakPtr getChannel() const = 0;
+};
 
 #endif //_INTERNAL_H_H

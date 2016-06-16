@@ -6,8 +6,76 @@
 
 #include <string.h>
 
+#include "utils.h"
+
 #define LOG_DEBUG(...) printf(__VA_ARGS__); printf("\n"); fflush(stdout)
 
+LibraryISO15765::LibraryISO15765(const LibraryPtr &library) : mLibrary(library) {
+
+}
+
+LibraryISO15765::~LibraryISO15765() {
+}
+
+DevicePtr LibraryISO15765::open(void *pName) {
+    DevicePtr ret = mLibrary->open(pName);
+	ret = std::make_shared<DeviceISO15765>(std::static_pointer_cast<LibraryISO15765>(shared_from_this()), ret);
+	mDevices.push_back(ret);
+	return ret;
+}
+
+void LibraryISO15765::close(const DevicePtr &devicePtr) {
+	mDevices.remove(devicePtr);
+}
+
+void LibraryISO15765::getLastError(char *pErrorDescription) {
+    return mLibrary->getLastError(pErrorDescription);
+}
+
+DeviceISO15765::DeviceISO15765(const LibraryISO15765Ptr &library, const DevicePtr &device) : mLibrary(library), mDevice(device) {
+}
+
+DeviceISO15765::~DeviceISO15765() {
+    LibraryPtr library = mDevice->getLibrary().lock();
+    assert(library);
+	
+    library->close(mDevice);
+}
+
+ChannelPtr DeviceISO15765::connect(unsigned long ProtocolID, unsigned long Flags, unsigned long BaudRate) {
+	UNUSED(Flags);
+	UNUSED(BaudRate);
+	if ((ProtocolID & 0x1FFF) == ISO15765) {
+		ProtocolID--; // USE CAN instead
+	}
+	ChannelPtr ret = mDevice->connect(ProtocolID, Flags, BaudRate);
+	if ((ProtocolID & 0x1FFF) == ISO15765) {
+		ret = std::make_shared<ChannelISO15765>(std::static_pointer_cast<DeviceISO15765>(shared_from_this()), ret);
+	}
+	return ret;
+}
+
+void DeviceISO15765::disconnect(const ChannelPtr &channelPtr) {
+    mChannels.remove(channelPtr);
+}
+
+void DeviceISO15765::setProgrammingVoltage(unsigned long PinNumber, unsigned long Voltage) {
+    mDevice->setProgrammingVoltage(PinNumber, Voltage);
+}
+
+void DeviceISO15765::readVersion(char *pFirmwareVersion, char *pDllVersion, char *pApiVersion) {
+    mDevice->readVersion(pFirmwareVersion, pDllVersion, pApiVersion);
+}
+
+void DeviceISO15765::ioctl(unsigned long IoctlID, void *pInput, void *pOutput) {
+    mDevice->ioctl(IoctlID, pInput, pOutput);
+}
+
+LibraryWeakPtr DeviceISO15765::getLibrary() const {
+    return mLibrary;
+}
+
+	
 /*
  *
  * ISO15765Transfer
@@ -31,12 +99,11 @@ static void pid2Data(uint32_t pid, uint8_t *data) {
     data[3] = (0xFF & (pid >> 0));
 }
 
-ISO15765Transfer::ISO15765Transfer(ChannelISO15765 &channel, const PASSTHRU_MSG &pMaskMsg, const PASSTHRU_MSG &pPatternMsg, const PASSTHRU_MSG &pFlowControlMsg):mChannel(channel), mState(START_STATE) {
+ISO15765Transfer::ISO15765Transfer(Configuration &configuration, Channel &channel, const PASSTHRU_MSG &pMaskMsg, const PASSTHRU_MSG &pPatternMsg, const PASSTHRU_MSG &pFlowControlMsg): mChannelConfiguration(configuration), mChannel(channel), mState(START_STATE) {
     mMaskPid = data2pid(pMaskMsg.Data);
     mPatternPid = data2pid(pPatternMsg.Data);
     mFlowControlPid = data2pid(pFlowControlMsg.Data);
-    mBs = mChannel.getBs();
-    mStmin = mChannel.getStmin();
+	clear();
 }
 
 ISO15765Transfer::~ISO15765Transfer() {
@@ -46,6 +113,9 @@ ISO15765Transfer::~ISO15765Transfer() {
 void ISO15765Transfer::clear() {
     mState = START_STATE;
     mOffset = 0;
+	mSequence = 0;
+	mBs = 0;
+	mStmin = 0;
 }
 
 #define IS_SF(d) (((d & 0xF0) >> 4) == 0)
@@ -129,7 +199,6 @@ void ISO15765Transfer::paddingMessage(PASSTHRU_MSG &smsg) {
 }
 
 bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) {
-    int stmin = 0;
     PASSTHRU_MSG &tmp_msg = mMessage;
     
     // Set Deadline
@@ -153,7 +222,6 @@ bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
         
         if(mState == START_STATE) {
             mOffset = J2534_DATA_OFFSET;
-            mSequence = 0;
             prepareSentMessageHeaders(tmp_msg, msg);
             
             // Compute
@@ -187,7 +255,7 @@ bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
             }
             
 			unsigned long count = 1;
-			mChannel.mChannel->writeMsgs(&tmp_msg, &count, Timeout);
+			mChannel.writeMsgs(&tmp_msg, &count, Timeout);
             if(count != 1) {
                 LOG_DEBUG("Can't write message %d", frameName);
                 goto fail;
@@ -195,7 +263,7 @@ bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
             mState = FLOW_CONTROL_STATE;
         } else if (mState == FLOW_CONTROL_STATE) {
 			unsigned long count = 1;
-			mChannel.mChannel->readMsgs(&tmp_msg, &count, Timeout);
+			mChannel.readMsgs(&tmp_msg, &count, Timeout);
             if(count != 1) {
                 LOG_DEBUG("Can't read flow control message");
                 goto fail;
@@ -215,10 +283,10 @@ bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
             }
             
             // Get block information
-            mMessageBs = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE];
-            stmin = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_BS_SIZE];
+            mBs = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE];
+            mStmin = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_BS_SIZE];
             
-            std::this_thread::sleep_for(std::chrono::milliseconds(stmin));
+            std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
             
             mState = BLOCK_STATE;
         } else if (mState == BLOCK_STATE) {
@@ -242,19 +310,19 @@ bool ISO15765Transfer::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
             
             // Write the message
 			unsigned long count = 1;
-			mChannel.mChannel->writeMsgs(&tmp_msg, &count, Timeout);
+			mChannel.writeMsgs(&tmp_msg, &count, Timeout);
             if(count != 1) {
                 LOG_DEBUG("Can't write message");
                 goto fail;
             }
             
             // End of the block ?
-            if(--mMessageBs == 0) {
+            if(--mBs == 0) {
                 mState = FLOW_CONTROL_STATE;
             }
             
             if(mState == BLOCK_STATE) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(stmin));
+                std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
             }
         } else {
             LOG_DEBUG("Wrong state");
@@ -285,7 +353,6 @@ bool ISO15765Transfer::readMsg(const PASSTHRU_MSG &in_msg, PASSTHRU_MSG &out_msg
         if(mState == START_STATE) {
             prepareReceivedMessageHeaders(read_msg, in_msg);
             mOffset = J2534_DATA_OFFSET;
-            mSequence = 0;
             
             if(frameName == SingleFrame) {
                 size_t size = in_msg.Data[J2534_DATA_OFFSET] & 0x0F;
@@ -325,7 +392,7 @@ bool ISO15765Transfer::readMsg(const PASSTHRU_MSG &in_msg, PASSTHRU_MSG &out_msg
             mSequence++;
             mOffset += size;
             
-            if(--mMessageBs == 0) {
+            if(--mBs == 0) {
                 if(!sendFlowControlMessage(Timeout)) {
                     LOG_DEBUG("Can't send flow control message");
                     goto fail;
@@ -351,6 +418,11 @@ fail:
 
 bool ISO15765Transfer::sendFlowControlMessage(unsigned long Timeout) {
     PASSTHRU_MSG tmp_msg;
+	
+	mBs = 0;
+    mChannelConfiguration.getValue(ISO15765_BS, &mBs);
+	mStmin = 0;
+    mChannelConfiguration.getValue(ISO15765_STMIN, &mStmin);
     
     tmp_msg.ProtocolID = CAN;
     tmp_msg.RxStatus = 0;
@@ -365,10 +437,8 @@ bool ISO15765Transfer::sendFlowControlMessage(unsigned long Timeout) {
     tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_BS_SIZE] = mStmin;
     paddingMessage(tmp_msg);
     
-    mMessageBs = mBs;
-    
 	unsigned long count = 1;
-	mChannel.mChannel->writeMsgs(&tmp_msg, &count, Timeout);
+	mChannel.writeMsgs(&tmp_msg, &count, Timeout);
     if(count != 1) {
         return false;
     }
@@ -393,20 +463,12 @@ uint32_t ISO15765Transfer::getFlowControlPid() {
  *
  */
 
-ChannelISO15765::ChannelISO15765(const ChannelPtr &channel): mChannel(channel) {
+ChannelISO15765::ChannelISO15765(const DeviceISO15765Ptr &device, const ChannelPtr &channel): ConfigurableChannel(ISO15765), mDevice(device), mChannel(channel) {
     
 }
 
 ChannelISO15765::~ChannelISO15765() {
     
-}
-
-int ChannelISO15765::getBs() const {
-    return bs;
-}
-    
-int ChannelISO15765::getStmin() const {
-    return stmin;
 }
 
 std::shared_ptr<ISO15765Transfer> ChannelISO15765::getTransferByFlowControl(const PASSTHRU_MSG &msg) {
@@ -448,7 +510,7 @@ MessageFilterPtr ChannelISO15765::startMsgFilter(unsigned long FilterType, PASST
         
         MessageFilterISO15765Ptr mf = std::make_shared<MessageFilterISO15765>(std::static_pointer_cast<ChannelISO15765>(shared_from_this()),
 			mChannel->startMsgFilter(PASS_FILTER, &maskMsg, &patternMsg, NULL),
-			std::make_shared<ISO15765Transfer>(*this, *pMaskMsg, *pPatternMsg, *pFlowControlMsg));
+			std::make_shared<ISO15765Transfer>(getConfiguration(), *mChannel, *pMaskMsg, *pPatternMsg, *pFlowControlMsg));
 		mMessageFilters.push_back(mf);
 		return mf;
 	} else {
@@ -479,12 +541,14 @@ void ChannelISO15765::readMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsi
 				goto end;
             }
             
-			unsigned long count = 1;
-			mChannel->readMsgs(&readMsg, &count, Timeout);
-            if (count != 1) {
-                LOG_DEBUG("Can't read msg");
-				goto end;
-            }
+			{
+				unsigned long c = 1;
+				mChannel->readMsgs(&readMsg, &c, Timeout);
+				if (c != 1) {
+					LOG_DEBUG("Can't read msg");
+					goto end;
+				}
+			}
             
             Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
 
@@ -532,63 +596,64 @@ end:
     *pNumMsgs = count;
 }
 
-void ChannelISO15765::ioctl(unsigned long IoctlID, void *pInput, void *pOutput) {
-    if(IoctlID == CLEAR_RX_BUFFER) {
-        mChannel->ioctl(IoctlID, pInput, pOutput);
-        for (auto& it : mMessageFilters) {
-            it->getTransfer()->clear();
-        }
-    } else if(IoctlID == SET_CONFIG) {
-        if (pInput == NULL) {
-            throw J2534Exception(ERR_NULLPARAMETER);
-        }
-        SCONFIG_LIST *Input = (SCONFIG_LIST *)pInput;
-        for (unsigned int i = 0; i < Input->NumOfParams; ++i) {
-            SCONFIG *config = &(Input->ConfigPtr[i]);
-            if(config->Parameter == ISO15765_BS) {
-                bs = config->Value;
-            } else if(config->Parameter == ISO15765_STMIN) {
-                stmin = config->Value;
-            } else {
-                SCONFIG_LIST altInput;
-                altInput.NumOfParams = 1;
-                altInput.ConfigPtr = config;
-                mChannel->ioctl(SET_CONFIG, &altInput, NULL);
-            }
-        }
-    } else if(IoctlID == GET_CONFIG) {
-        if (pInput == NULL) {
-            throw J2534Exception(ERR_NULLPARAMETER);
-        }
-        SCONFIG_LIST *Input = (SCONFIG_LIST *)pInput;
-        for (unsigned int i = 0; i < Input->NumOfParams; ++i) {
-            SCONFIG *config = &(Input->ConfigPtr[i]);
-            if(config->Parameter == ISO15765_BS) {
-                config->Value = bs;
-            } else if(config->Parameter == ISO15765_STMIN) {
-                config->Value = stmin;
-            } else {
-                SCONFIG_LIST altInput;
-                altInput.NumOfParams = 1;
-                altInput.ConfigPtr = config;
-                mChannel->ioctl(GET_CONFIG, &altInput, NULL);
-            }
-        }
-    } else {
-        mChannel->ioctl(IoctlID, pInput, pOutput);
-    }
-}
-
-unsigned long ChannelISO15765::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
+PeriodicMessagePtr ChannelISO15765::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
     return mChannel->startPeriodicMsg(pMsg, TimeInterval);
 }
 
-void ChannelISO15765::stopPeriodicMsg(unsigned long periodicMessage) {
+void ChannelISO15765::stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) {
     mChannel->stopPeriodicMsg(periodicMessage);
 }
 
 DeviceWeakPtr ChannelISO15765::getDevice() const {
-    return mChannel->getDevice();
+    return mDevice;
+}
+
+bool ChannelISO15765::getConfig(SCONFIG *config) const {
+	ConfigurableChannel::getConfig(config);
+	unsigned long parameter = config->Parameter;
+	if(parameter != ISO15765_BS && parameter != ISO15765_STMIN && parameter != ISO15765_ADDR_TYPE) {
+		SCONFIG_LIST Input;
+		Input.NumOfParams = 1;
+		Input.ConfigPtr = config;
+		mChannel->ioctl(GET_CONFIG, &Input, NULL);
+	}
+    return true;
+}
+
+bool ChannelISO15765::setConfig(SCONFIG *config) {
+	ConfigurableChannel::setConfig(config);
+	unsigned long parameter = config->Parameter;
+	if(parameter != ISO15765_BS && parameter != ISO15765_STMIN && parameter != ISO15765_ADDR_TYPE) {
+		SCONFIG_LIST Input;
+		Input.NumOfParams = 1;
+		Input.ConfigPtr = config;
+		mChannel->ioctl(SET_CONFIG, &Input, NULL);
+	}
+    return true;
+}
+	
+bool ChannelISO15765::clearTxBuffers() {
+    return false;
+}
+
+bool ChannelISO15765::clearRxBuffers() {
+    return false;
+}
+
+bool ChannelISO15765::clearPeriodicMessages() {
+    return false;
+}
+
+bool ChannelISO15765::clearMessageFilters() {
+	mMessageFilters.clear();
+    return false;
+}
+	
+bool ChannelISO15765::handle_ioctl(unsigned long IoctlID, void *pInput, void *pOutput) {
+    if(!ConfigurableChannel::handle_ioctl(IoctlID, pInput, pOutput)) {
+	    mChannel->ioctl(IoctlID, pInput, pOutput);
+	}
+	return true;
 }
 
 
@@ -609,8 +674,4 @@ ChannelWeakPtr MessageFilterISO15765::getChannel() const {
 	
 ISO15765TransferPtr& MessageFilterISO15765::getTransfer() {
 	return mTransfer;
-}
-
-ChannelPtr createISO15765Channel(const ChannelPtr &channel) {
-    return std::make_shared<ChannelISO15765>(channel);
 }

@@ -65,9 +65,9 @@ public:
 
     virtual void writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) override;
 
-    virtual unsigned long startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) override;
+    virtual PeriodicMessagePtr startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) override;
 
-    virtual void stopPeriodicMsg(unsigned long periodicMessage) override;
+    virtual void stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) override;
 
     virtual MessageFilterPtr startMsgFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg,
                                          PASSTHRU_MSG *pFlowControlMsg) override;
@@ -245,13 +245,13 @@ end:
     return;
 }
 
-unsigned long ChannelTest::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
+PeriodicMessagePtr ChannelTest::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
     UNUSED(pMsg);
     UNUSED(TimeInterval);
-    return 0;
+    return nullptr;
 }
 
-void ChannelTest::stopPeriodicMsg(unsigned long periodicMessage) {
+void ChannelTest::stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) {
     UNUSED(periodicMessage);
 }
 
@@ -300,8 +300,8 @@ int main(int argc, char *argv[]) {
     bus->addChannel(channel1);
     bus->addChannel(channel2);
 
-    ChannelPtr c1 = createISO15765Channel(channel1);
-    ChannelPtr c2 = createISO15765Channel(channel2);
+    ChannelPtr c1 = std::make_shared<ChannelISO15765>(nullptr, channel1);
+    ChannelPtr c2 = std::make_shared<ChannelISO15765>(nullptr, channel2);
 
     uint32_t pid1 = 0x1234;
     uint32_t pid2 = 0x4321;
@@ -311,6 +311,7 @@ int main(int argc, char *argv[]) {
 	PASSTHRU_MSG msg2;
 	
     msg1.DataSize = size + J2534_DATA_OFFSET;
+	msg1.TxFlags = 0;
     pid2Data(pid2, msg1.Data);
     for(size_t i = 0; i < size; ++i) {
         msg1.Data[i + J2534_DATA_OFFSET] = (uint8_t)(i%256);
@@ -363,7 +364,14 @@ int main(int argc, char *argv[]) {
 
     t.join();
     t2.join();
-
+	
+    printf("Written %ld\n", written);
+    printf("Read %ld\n", read);
+	
+	if(written != 1 || read != 1) {
+        LOG_DEBUG("Wrong received/sent message");
+        return -1;
+	}
 
     // Check the test
     if(msg2.DataSize != (J2534_DATA_OFFSET + size)) {
@@ -379,9 +387,6 @@ int main(int argc, char *argv[]) {
         return -2;
     }
 
-
-    printf("Written %ld\n", written);
-    printf("Read %ld\n", read);
     printf("Test OK!\n");
 
     return 0;

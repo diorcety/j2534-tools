@@ -4,6 +4,18 @@
 #include "utils.h"
 #include <assert.h>
 
+J2534Exception::J2534Exception(long code) : mCode(code) {
+}
+
+long J2534Exception::code() const {
+    return mCode;
+}
+
+const char *J2534Exception::what() const noexcept {
+    static char buffer[256];
+    snprintf(buffer, 256, "Error code: %ld", mCode);
+    return buffer;
+}
 
 LibrarySimple::LibrarySimple(j2534_fcts *proxy) : mProxy(proxy) {
 
@@ -174,7 +186,7 @@ void ChannelSimple::writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsig
     }
 }
 
-unsigned long ChannelSimple::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
+PeriodicMessagePtr ChannelSimple::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) {
     unsigned long msgID;
     DeviceSimplePtr device = mDevice.lock();
     assert(device);
@@ -188,21 +200,13 @@ unsigned long ChannelSimple::startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long 
         throw J2534Exception(ret);
     }
 
-    return msgID;
+	PeriodicMessagePtr periodicMessage = createPeriodicMessage(pMsg, TimeInterval, msgID);
+    mPeriodicMessages.push_back(periodicMessage);
+    return periodicMessage;
 }
 
-void ChannelSimple::stopPeriodicMsg(unsigned long periodicMessage) {
-    DeviceSimplePtr device = mDevice.lock();
-    assert(device);
-
-    LibrarySimplePtr library = device->getLibrarySimple().lock();
-    assert(library);
-
-    long ret;
-    ret = library->getProxy()->passThruStopPeriodicMsg(mChannelId, periodicMessage);
-    if (ret != STATUS_NOERROR) {
-        throw J2534Exception(ret);
-    }
+void ChannelSimple::stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) {
+    mPeriodicMessages.remove(periodicMessage);
 }
 
 MessageFilterPtr ChannelSimple::startMsgFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg,
@@ -259,6 +263,15 @@ MessageFilterPtr ChannelSimple::createMessageFilter(unsigned long FilterType, PA
     return std::make_shared<MessageFilterSimple>(std::static_pointer_cast<ChannelSimple>(shared_from_this()), messageFilterId);
 }
 
+PeriodicMessagePtr ChannelSimple::createPeriodicMessage(PASSTHRU_MSG *pMsg, unsigned long TimeInterval, unsigned long periodicMessageId) {
+	UNUSED(pMsg);
+	UNUSED(TimeInterval);
+    return std::make_shared<PeriodicMessageSimple>(std::static_pointer_cast<ChannelSimple>(shared_from_this()), periodicMessageId);
+}
+
+/*
+ * MessageFilterSimple
+ */
 
 MessageFilterSimple::MessageFilterSimple(const ChannelSimplePtr& channel, unsigned long messageFilterId) : mChannel(channel), mMessageFilterId(messageFilterId) {
 	
@@ -283,4 +296,33 @@ MessageFilterSimple::~MessageFilterSimple() {
 
 ChannelWeakPtr MessageFilterSimple::getChannel() const {
 	return mChannel;
+}
+
+/*
+ * PeriodicMessageSimple
+ */
+
+PeriodicMessageSimple::PeriodicMessageSimple(const ChannelSimplePtr& channel, unsigned long periodicMessageId) : mChannel(channel), mPeriodicMessageId(periodicMessageId) {
+
+}
+
+PeriodicMessageSimple::~PeriodicMessageSimple() {
+    ChannelSimplePtr channel = mChannel.lock();
+    assert(channel);
+	
+    DeviceSimplePtr device = channel->getDeviceSimple().lock();
+    assert(device);
+
+    LibrarySimplePtr library = device->getLibrarySimple().lock();
+    assert(library);
+
+    long ret;
+    ret = library->getProxy()->passThruStopPeriodicMsg(channel->mChannelId, mPeriodicMessageId);
+    if (ret != STATUS_NOERROR) {
+        throw J2534Exception(ret);
+    }
+}
+
+ChannelWeakPtr PeriodicMessageSimple::getChannel() const {
+    return mChannel;
 }

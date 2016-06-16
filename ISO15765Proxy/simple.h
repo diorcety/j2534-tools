@@ -3,6 +3,9 @@
 #ifndef _SIMPLE_H
 #define _SIMPLE_H
 
+#include "ISO15765Proxy.h"
+#include <exception>
+#include <list>
 #include "internal.h"
 #include <memory>
 
@@ -25,6 +28,18 @@ class LibrarySimple;
 
 typedef std::shared_ptr <LibrarySimple> LibrarySimplePtr;
 typedef std::weak_ptr <LibrarySimple> LibrarySimpleWeakPtr;
+
+class J2534Exception : public std::exception {
+public:
+    J2534Exception(long code);
+
+    long code() const;
+
+    virtual const char *what() const noexcept;
+
+private:
+    long mCode;
+};
 
 class LibrarySimple : public Library {
 public:
@@ -81,6 +96,7 @@ protected:
 
 class ChannelSimple : public Channel {
 	friend class MessageFilterSimple;
+	friend class PeriodicMessageSimple;
 public:
     ChannelSimple(const DeviceSimplePtr &device, unsigned long channelId);
 
@@ -90,9 +106,9 @@ public:
 
     virtual void writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) override;
 
-    virtual unsigned long startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) override;
+    virtual PeriodicMessagePtr startPeriodicMsg(PASSTHRU_MSG *pMsg, unsigned long TimeInterval) override;
 
-    virtual void stopPeriodicMsg(unsigned long periodicMessage) override;
+    virtual void stopPeriodicMsg(const PeriodicMessagePtr &periodicMessage) override;
 
     virtual MessageFilterPtr startMsgFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg,
                                          PASSTHRU_MSG *pFlowControlMsg) override;
@@ -109,9 +125,11 @@ public:
 	
 protected:
 	virtual MessageFilterPtr createMessageFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg, unsigned long messageFilterId);
+	virtual PeriodicMessagePtr createPeriodicMessage(PASSTHRU_MSG *pMsg, unsigned long TimeInterval, unsigned long periodicMessageId);
 
     DeviceSimpleWeakPtr mDevice;
 	std::list<MessageFilterPtr> mMessageFilters;
+	std::list<PeriodicMessagePtr> mPeriodicMessages;
     unsigned long mChannelId;
 };
 
@@ -124,6 +142,17 @@ public:
 protected:
     ChannelSimpleWeakPtr mChannel;
     unsigned long mMessageFilterId;
+};
+
+class PeriodicMessageSimple : public PeriodicMessage {
+public:
+	PeriodicMessageSimple(const ChannelSimplePtr& channel, unsigned long periodicMessageId);
+	~PeriodicMessageSimple();
+
+	virtual ChannelWeakPtr getChannel() const override;
+protected:
+    ChannelSimpleWeakPtr mChannel;
+    unsigned long mPeriodicMessageId;
 };
 
 #endif //_SIMPLE_H

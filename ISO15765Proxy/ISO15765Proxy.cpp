@@ -3,13 +3,13 @@
 #include "ISO15765Proxy.h"
 #include "log.h"
 #include "internal.h"
-#include "simple.h"
+#include "iso15765.h"
 #include <assert.h>
 
 LibraryPtr library;
 
 void create_library(j2534_fcts *proxy) {
-    library = std::make_shared<LibrarySimple>(proxy);
+    library = std::make_shared<LibraryISO15765>(std::make_shared<LibrarySimple>(proxy));
 }
 
 void delete_library() {
@@ -127,7 +127,8 @@ long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *p
     try {
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
 
-        *pMsgID = channel->startPeriodicMsg(pMsg, TimeInterval);
+        PeriodicMessagePtr periodicMessage = channel->startPeriodicMsg(pMsg, TimeInterval);
+		*pMsgID = reinterpret_cast<unsigned long>(periodicMessage.get());
     } catch (J2534Exception &exception) {
         ret = exception.code();
     }
@@ -142,8 +143,9 @@ long J2534_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long Ms
     long ret = STATUS_NOERROR;
     try {
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
+		PeriodicMessage *periodicMessage = reinterpret_cast<PeriodicMessage *>(MsgID);
 
-        channel->stopPeriodicMsg(MsgID);
+        channel->stopPeriodicMsg(periodicMessage->shared_from_this());
     } catch (J2534Exception &exception) {
         ret = exception.code();
     }

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(ISO15765Proxy)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Werror")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_LOGGING")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--enable-stdcall-fixup")
@@ -11,10 +11,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static -static-libgcc -static-libstdc++
 # Sources
 set(COMMON_FILES ${COMMON_FILES} internal.cpp internal.h)
 set(COMMON_FILES ${COMMON_FILES} iso15765.cpp iso15765.h)
+set(COMMON_FILES ${COMMON_FILES} configurable_channel.cpp configurable_channel.h)
+set(COMMON_FILES ${COMMON_FILES} simple.cpp simple.h)
 
 set(SOURCE_FILES ${SOURCE_FILES} log.h log.cpp)
 set(SOURCE_FILES ${SOURCE_FILES} ISO15765Proxy.h ISO15765Proxy.cpp)
-set(SOURCE_FILES ${SOURCE_FILES} simple.cpp simple.h)
 set(SOURCE_FILES ${SOURCE_FILES} stdafx.h stdafx.cpp)
 set(SOURCE_FILES ${SOURCE_FILES} targetver.h)
 set(SOURCE_FILES ${SOURCE_FILES} utils.h)

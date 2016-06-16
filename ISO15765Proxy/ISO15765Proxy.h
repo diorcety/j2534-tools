@@ -56,9 +56,4 @@ typedef struct {
     PTIOCTL passThruIoctl;
 } j2534_fcts;
 
-#ifdef _WIN32
-extern HINSTANCE proxy_handle1;
-#endif //_WIN32
-extern j2534_fcts *proxy1;
-
 #endif // __ISO15765PROXY_H

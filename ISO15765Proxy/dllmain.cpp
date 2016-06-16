@@ -8,6 +8,9 @@
 HINSTANCE proxy_handle1;
 j2534_fcts *proxy1;
 
+extern void create_library(j2534_fcts *proxy);
+extern void delete_library();
+
 #define LOAD_FCT(proxy_handle, name, type, dest) { \
     dest = (type)GetProcAddress(proxy_handle, #name); \
     if(dest == NULL) { \
