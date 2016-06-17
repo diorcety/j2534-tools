@@ -18,20 +18,9 @@
 #define LOG_DEBUG(...)
 #endif //DEBUG
 
-class ChannelTest;
-
-typedef std::shared_ptr <ChannelTest> ChannelTestPtr;
-typedef std::weak_ptr <ChannelTest> ChannelTestWeakPtr;
-
-class MessageFilterTest;
-
-typedef std::shared_ptr <MessageFilterTest> MessageFilterTestPtr;
-typedef std::weak_ptr <MessageFilterTest> MessageFilterTestWeakPtr;
-
-class Bus;
-
-typedef std::shared_ptr <Bus> BusPtr;
-typedef std::weak_ptr <Bus> BusWeakPtr;
+DEFINE_SHARED(ChannelTest)
+DEFINE_SHARED(MessageFilterTest)
+DEFINE_SHARED(Bus)
 
 class Bus: public std::enable_shared_from_this<Bus> {
     friend class ChannelTest;
@@ -58,8 +47,8 @@ class ChannelTest: public Channel {
     friend class Bus;
 public:
     ChannelTest();
-	
-	virtual ~ChannelTest();
+    
+    virtual ~ChannelTest();
 
     virtual void readMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) override;
 
@@ -90,9 +79,9 @@ private:
 
 class MessageFilterTest : public MessageFilter {
 public:
-	MessageFilterTest(const ChannelTestPtr& channel);
+    MessageFilterTest(const ChannelTestPtr& channel);
 
-	virtual ChannelWeakPtr getChannel() const override;
+    virtual ChannelWeakPtr getChannel() const override;
 protected:
     ChannelTestWeakPtr mChannel;
 };
@@ -102,7 +91,7 @@ MessageFilterTest::MessageFilterTest(const ChannelTestPtr& channel): mChannel(ch
 }
 
 ChannelWeakPtr MessageFilterTest::getChannel() const {
-	return mChannel;
+    return mChannel;
 }
 
 Bus::Bus(): mContinue(true), mThread(_run, this) {
@@ -118,7 +107,7 @@ Bus::~Bus() {
 }
 
 void Bus::_run(Bus *bus) {
-	bus->run();
+    bus->run();
 }
 
 void Bus::addChannel(const ChannelTestPtr &channel) {
@@ -179,7 +168,7 @@ ChannelTest::ChannelTest() {
 }
 
 ChannelTest::~ChannelTest() {
-	
+    
 }
 
 void ChannelTest::readMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) {
@@ -194,28 +183,28 @@ void ChannelTest::readMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned
     std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
     unsigned long count = 0;
     std::unique_lock<std::mutex> lck (mMutex);
-	
+    
     for(unsigned long i = 0; i < *pNumMsgs; ++i) {
         while(mInBuffers.empty()) {
             if(mInterrupted.wait_until(lck, deadline) == std::cv_status::timeout) {
-				goto end;
+                goto end;
             }
         }
         *(pMsg++) = mInBuffers.front();
         mInBuffers.pop_front();
-		
-		count++;
+        
+        count++;
     }
 end:
-	*pNumMsgs = count;
-	LOG_DEBUG("Read %ld message(s)", *pNumMsgs);
+    *pNumMsgs = count;
+    LOG_DEBUG("Read %ld message(s)", *pNumMsgs);
 }
 
 void ChannelTest::writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) {
     BusPtr bus = mBus.lock();
     if(!bus) {
         LOG_DEBUG("No connected to bus");
-		*pNumMsgs = 0;
+        *pNumMsgs = 0;
         return;
     }
 
@@ -233,15 +222,15 @@ void ChannelTest::writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigne
 
         while(!mOutBuffers.empty()) {
             if(mInterrupted.wait_until(lck, deadline) == std::cv_status::timeout) {
-				goto end;
+                goto end;
             }
         }
-		
-		count++;
+        
+        count++;
     }
 
 end:
-	*pNumMsgs = count;
+    *pNumMsgs = count;
     return;
 }
 
@@ -300,18 +289,18 @@ int main(int argc, char *argv[]) {
     bus->addChannel(channel1);
     bus->addChannel(channel2);
 
-    ChannelPtr c1 = std::make_shared<ChannelISO15765>(nullptr, channel1);
-    ChannelPtr c2 = std::make_shared<ChannelISO15765>(nullptr, channel2);
+    ChannelPtr c1 = std::make_shared<ChannelISO15765>(ISO15765, nullptr, channel1);
+    ChannelPtr c2 = std::make_shared<ChannelISO15765>(ISO15765, nullptr, channel2);
 
     uint32_t pid1 = 0x1234;
     uint32_t pid2 = 0x4321;
     size_t size = 1023;
 
     PASSTHRU_MSG msg1;
-	PASSTHRU_MSG msg2;
-	
+    PASSTHRU_MSG msg2;
+    
     msg1.DataSize = size + J2534_DATA_OFFSET;
-	msg1.TxFlags = 0;
+    msg1.TxFlags = 0;
     pid2Data(pid2, msg1.Data);
     for(size_t i = 0; i < size; ++i) {
         msg1.Data[i + J2534_DATA_OFFSET] = (uint8_t)(i%256);
@@ -353,25 +342,25 @@ int main(int argc, char *argv[]) {
     printf("Start\n");
     fflush(stdout);
     std::thread t([&]() {
-		written = 1;
+        written = 1;
         c1->writeMsgs(&msg1, &written, 5000);
     });
 
     std::thread t2([&]() {
-		read = 1;
+        read = 1;
         c2->readMsgs(&msg2, &read, 5000);
     });
 
     t.join();
     t2.join();
-	
+    
     printf("Written %ld\n", written);
     printf("Read %ld\n", read);
-	
-	if(written != 1 || read != 1) {
+    
+    if(written != 1 || read != 1) {
         LOG_DEBUG("Wrong received/sent message");
         return -1;
-	}
+    }
 
     // Check the test
     if(msg2.DataSize != (J2534_DATA_OFFSET + size)) {

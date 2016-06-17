@@ -4,7 +4,13 @@
 #include "log.h"
 #include "utils.h"
 
+#ifdef _WIN32
 #define LOG_FILE "C:\\temp\\ftdi.log"
+#endif //_WIN32
+
+#ifdef __linux__
+#define LOG_FILE "/tmp/ftdi.log"
+#endif //__linux__
 
 static FILE *logging_file = NULL;
 
@@ -23,7 +29,9 @@ int logging_log(int level, const char *fmt, ...) {
 }
 
 void logging_start() {
-    fopen_s(&logging_file, LOG_FILE, "a+");
+    if(logging_file == NULL) {
+      logging_file = fopen(LOG_FILE, "a+");
+    }
 }
 
 void logging_stop() {

@@ -91,7 +91,7 @@
 #define READ_VBATT                        0x03
 #define FIVE_BAUD_INIT                    0x04
 #define FAST_INIT                        0x05
-// unused								0x06
+// unused                                0x06
 #define CLEAR_TX_BUFFER                    0x07
 #define CLEAR_RX_BUFFER                    0x08
 #define CLEAR_PERIODIC_MSGS                0x09
@@ -111,7 +111,7 @@
 /*******************************/
 
 #define DATA_RATE                    0x01
-// unused							0x02
+// unused                            0x02
 #define LOOPBACK                    0x03
 #define NODE_ADDRESS                0x04
 #define NETWORK_LINE                0x05
@@ -138,7 +138,7 @@
 #define W0                            0x19
 #define T1_MAX                        0x1A
 #define T2_MAX                        0x1B
-// See T3_MAX						0x24
+// See T3_MAX                        0x24
 #define T4_MAX                        0x1C
 #define T5_MAX                        0x1D
 #define ISO15765_BS                    0x1E
@@ -157,8 +157,8 @@
 // PP= primary pin, usually positive (eg CAN hi-signal)
 // SS= secondary pin (usually negative) or maybe ISO L-line), can be omitted (0x00) if not needed
 // result: STATUS_NOERROR if ok
-//	ERR_PIN_INVALID if invalid or dangerous pin combination
-//	ERR_NOT_SUPPORTED if not supported by HW
+//    ERR_PIN_INVALID if invalid or dangerous pin combination
+//    ERR_NOT_SUPPORTED if not supported by HW
 #define J1962_PINS                    0x8001    /*-2*/
 
 #define SW_CAN_HS_DATA_RATE            0x8010    /*-2*/
@@ -345,7 +345,7 @@
 // 1 = extended address is first byte after the CAN ID
 #define ISO15765_ADDR_TYPE                0x00000080
 
-//CAN_29BIT_ID							0x00000100  defined above
+//CAN_29BIT_ID                            0x00000100  defined above
 
 #define    SW_CAN_NS_RX                    0x00040000    /*-2*/
 #define    SW_CAN_HS_RX                    0x00020000    /*-2*/
@@ -359,8 +359,8 @@
 // 1 = pad all flow controlled messages to a full CAN frame using zeroes
 #define ISO15765_FRAME_PAD                0x00000040
 
-//ISO15765_ADDR_TYPE					0x00000080  defined above
-//CAN_29BIT_ID							0x00000100  defined above
+//ISO15765_ADDR_TYPE                    0x00000080  defined above
+//CAN_29BIT_ID                            0x00000100  defined above
 
 // 0 = Interface message timing as specified in ISO 14230
 // 1 = After a response is received for a physical request, the wait time shall be reduced to P3_MIN

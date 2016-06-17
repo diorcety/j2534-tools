@@ -26,7 +26,7 @@ enum FT_STATUS {
     FT_DEVICE_NOT_OPENED,
     FT_IO_ERROR,
     FT_INSUFFICIENT_RESOURCES,
-	FT_INVALID_PARAMETER
+    FT_INVALID_PARAMETER
 };
 
 
@@ -43,9 +43,9 @@ enum FT_STATUS {
 // FT_ListDevices Flags (used in conjunction with FT_OpenEx Flags
 //
 
-#define FT_LIST_NUMBER_ONLY			0x80000000
-#define FT_LIST_BY_INDEX			0x40000000
-#define FT_LIST_ALL					0x20000000
+#define FT_LIST_NUMBER_ONLY            0x80000000
+#define FT_LIST_BY_INDEX            0x40000000
+#define FT_LIST_ALL                    0x20000000
 
 #define FT_LIST_MASK (FT_LIST_NUMBER_ONLY|FT_LIST_BY_INDEX|FT_LIST_ALL)
 
@@ -53,47 +53,47 @@ enum FT_STATUS {
 // Baud Rates
 //
 
-#define FT_BAUD_300			300
-#define FT_BAUD_600			600
-#define FT_BAUD_1200		1200
-#define FT_BAUD_2400		2400
-#define FT_BAUD_4800		4800
-#define FT_BAUD_9600		9600
-#define FT_BAUD_14400		14400
-#define FT_BAUD_19200		19200
-#define FT_BAUD_38400		38400
-#define FT_BAUD_57600		57600
-#define FT_BAUD_115200		115200
-#define FT_BAUD_230400		230400
-#define FT_BAUD_460800		460800
-#define FT_BAUD_921600		921600
+#define FT_BAUD_300            300
+#define FT_BAUD_600            600
+#define FT_BAUD_1200        1200
+#define FT_BAUD_2400        2400
+#define FT_BAUD_4800        4800
+#define FT_BAUD_9600        9600
+#define FT_BAUD_14400        14400
+#define FT_BAUD_19200        19200
+#define FT_BAUD_38400        38400
+#define FT_BAUD_57600        57600
+#define FT_BAUD_115200        115200
+#define FT_BAUD_230400        230400
+#define FT_BAUD_460800        460800
+#define FT_BAUD_921600        921600
 
 //
 // Word Lengths
 //
 
-#define FT_BITS_8			(UCHAR) 8
-#define FT_BITS_7			(UCHAR) 7
-#define FT_BITS_6			(UCHAR) 6
-#define FT_BITS_5			(UCHAR) 5
+#define FT_BITS_8            (UCHAR) 8
+#define FT_BITS_7            (UCHAR) 7
+#define FT_BITS_6            (UCHAR) 6
+#define FT_BITS_5            (UCHAR) 5
 
 //
 // Stop Bits
 //
 
-#define FT_STOP_BITS_1		(UCHAR) 0
-#define FT_STOP_BITS_1_5	(UCHAR) 1
-#define FT_STOP_BITS_2		(UCHAR) 2
+#define FT_STOP_BITS_1        (UCHAR) 0
+#define FT_STOP_BITS_1_5    (UCHAR) 1
+#define FT_STOP_BITS_2        (UCHAR) 2
 
 //
 // Parity
 //
 
-#define FT_PARITY_NONE		(UCHAR) 0
-#define FT_PARITY_ODD		(UCHAR) 1
-#define FT_PARITY_EVEN		(UCHAR) 2
-#define FT_PARITY_MARK		(UCHAR) 3
-#define FT_PARITY_SPACE		(UCHAR) 4
+#define FT_PARITY_NONE        (UCHAR) 0
+#define FT_PARITY_ODD        (UCHAR) 1
+#define FT_PARITY_EVEN        (UCHAR) 2
+#define FT_PARITY_MARK        (UCHAR) 3
+#define FT_PARITY_SPACE        (UCHAR) 4
 
 //
 // Flow Control
@@ -116,7 +116,7 @@ enum FT_STATUS {
 
 typedef void (*PFT_EVENT_HANDLER)(DWORD,DWORD);
 
-#define FT_EVENT_RXCHAR		    1
+#define FT_EVENT_RXCHAR            1
 #define FT_EVENT_MODEM_STATUS   2
 
 //
@@ -161,28 +161,28 @@ typedef FT_STATUS (__stdcall *pFT_WaitOnMask)(FT_HANDLE ftHandle, DWORD *Mask);
 
 FTD2XX_API
 FT_STATUS WINAPI FT_Open(
-	int deviceNumber,
-	FT_HANDLE *pHandle
-	);
+    int deviceNumber,
+    FT_HANDLE *pHandle
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_OpenEx(
     PVOID pArg1,
-   	DWORD Flags,
-	FT_HANDLE *pHandle
-	);
+       DWORD Flags,
+    FT_HANDLE *pHandle
+    );
 
 FTD2XX_API 
 FT_STATUS WINAPI FT_ListDevices(
-	PVOID pArg1,
-	PVOID pArg2,
-	DWORD Flags
-	);
+    PVOID pArg1,
+    PVOID pArg2,
+    DWORD Flags
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_Close(
-	FT_HANDLE ftHandle
-	);
+    FT_HANDLE ftHandle
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_Read(
@@ -215,22 +215,22 @@ FT_STATUS WINAPI FT_IoCtl(
 FTD2XX_API
 FT_STATUS WINAPI FT_SetBaudRate(
     FT_HANDLE ftHandle,
-	ULONG BaudRate
-	);
+    ULONG BaudRate
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetDivisor(
     FT_HANDLE ftHandle,
-	USHORT Divisor
-	);
+    USHORT Divisor
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetDataCharacteristics(
     FT_HANDLE ftHandle,
-	UCHAR WordLength,
-	UCHAR StopBits,
-	UCHAR Parity
-	);
+    UCHAR WordLength,
+    UCHAR StopBits,
+    UCHAR Parity
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetFlowControl(
@@ -238,79 +238,79 @@ FT_STATUS WINAPI FT_SetFlowControl(
     USHORT FlowControl,
     UCHAR XonChar,
     UCHAR XoffChar
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_ResetDevice(
     FT_HANDLE ftHandle
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetDtr(
     FT_HANDLE ftHandle
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_ClrDtr(
     FT_HANDLE ftHandle
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetRts(
     FT_HANDLE ftHandle
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_ClrRts(
     FT_HANDLE ftHandle
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_GetModemStatus(
     FT_HANDLE ftHandle,
-	ULONG *pModemStatus
-	);
+    ULONG *pModemStatus
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetChars(
     FT_HANDLE ftHandle,
-	UCHAR EventChar,
-	UCHAR EventCharEnabled,
-	UCHAR ErrorChar,
-	UCHAR ErrorCharEnabled
+    UCHAR EventChar,
+    UCHAR EventCharEnabled,
+    UCHAR ErrorChar,
+    UCHAR ErrorCharEnabled
     );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_Purge(
     FT_HANDLE ftHandle,
-	ULONG Mask
-	);
+    ULONG Mask
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetTimeouts(
     FT_HANDLE ftHandle,
-	ULONG ReadTimeout,
-	ULONG WriteTimeout
-	);
+    ULONG ReadTimeout,
+    ULONG WriteTimeout
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_GetQueueStatus(
     FT_HANDLE ftHandle,
-	DWORD *dwRxBytes
-	);
+    DWORD *dwRxBytes
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetEventNotification(
     FT_HANDLE ftHandle,
-	DWORD Mask,
-	PVOID Param
-	);
+    DWORD Mask,
+    PVOID Param
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_GetEventStatus(
     FT_HANDLE ftHandle,
     DWORD *dwEventDWord
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_GetStatus(
@@ -318,7 +318,7 @@ FT_STATUS WINAPI FT_GetStatus(
     DWORD *dwRxBytes,
     DWORD *dwTxBytes,
     DWORD *dwEventDWord
-	);
+    );
 
 FTD2XX_API
 FT_STATUS WINAPI FT_SetBreakOn(

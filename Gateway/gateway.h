@@ -2,11 +2,12 @@
 #ifndef _GATEWAY_H
 #define _GATEWAY_H
 
-#ifdef GATEWAY_EXPORTS
+#ifdef _WIN32
 #define GATEWAY_API __stdcall
-#else
-#define GATEWAY_API __stdcall
-#endif
+#endif //_WIN32
+#ifdef __linux__
+#define GATEWAY_API
+#endif //__linux__
 
 typedef void (GATEWAY_API *pSetDeviceToOpen)(long value);
 typedef long (GATEWAY_API *pGetDeviceToOpen)();

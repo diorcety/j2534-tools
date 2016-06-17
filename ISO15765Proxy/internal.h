@@ -4,40 +4,21 @@
 #define _INTERNAL_H_H
 
 #include "j2534_v0404.h"
-#include <memory>
+#include "utils.h"
 
-class PeriodicMessage;
-
-typedef std::shared_ptr <PeriodicMessage> PeriodicMessagePtr;
-typedef std::weak_ptr <PeriodicMessage> PeriodicMessageWeakPtr;
-
-class MessageFilter;
-
-typedef std::shared_ptr <MessageFilter> MessageFilterPtr;
-typedef std::weak_ptr <MessageFilter> MessageFilterWeakPtr;
-
-class Channel;
-
-typedef std::shared_ptr <Channel> ChannelPtr;
-typedef std::weak_ptr <Channel> ChannelWeakPtr;
-
-class Device;
-
-typedef std::shared_ptr <Device> DevicePtr;
-typedef std::weak_ptr <Device> DeviceWeakPtr;
-
-class Library;
-
-typedef std::shared_ptr <Library> LibraryPtr;
-typedef std::weak_ptr <Library> LibraryWeakPtr;
+DEFINE_SHARED(PeriodicMessage)
+DEFINE_SHARED(MessageFilter)
+DEFINE_SHARED(Channel)
+DEFINE_SHARED(Device)
+DEFINE_SHARED(Library)
 
 class Configuration {
 public:
-	virtual ~Configuration();
+    virtual ~Configuration();
 
-	virtual bool getValue(unsigned long config, unsigned long *value) const = 0;
+    virtual bool getValue(unsigned long config, unsigned long *value) const = 0;
 
-	virtual bool setValue(unsigned long config, unsigned long value) = 0;
+    virtual bool setValue(unsigned long config, unsigned long value) = 0;
 };
 
 class Library : public std::enable_shared_from_this<Library> {
@@ -92,14 +73,14 @@ public:
 class MessageFilter : public std::enable_shared_from_this<MessageFilter> {
 public:
     virtual ~MessageFilter() = 0;
-	
+    
     virtual ChannelWeakPtr getChannel() const = 0;
 };
 
 class PeriodicMessage : public std::enable_shared_from_this<PeriodicMessage> {
 public:
     virtual ~PeriodicMessage() = 0;
-	
+    
     virtual ChannelWeakPtr getChannel() const = 0;
 };
 

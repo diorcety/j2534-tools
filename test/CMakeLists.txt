@@ -19,5 +19,7 @@ set(SOURCE_FILES ${SOURCE_FILES} j2534_v0404.h)
 # Libraries
 find_library(SHLWAPI shlwapi.lib)
 
+IF (WIN32)
 add_executable(dsfsdfsdf ${SOURCE_FILES})
 target_link_libraries(dsfsdfsdf SHLWAPI)
+ENDIF ()

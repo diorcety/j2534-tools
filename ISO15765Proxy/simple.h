@@ -9,25 +9,11 @@
 #include "internal.h"
 #include <memory>
 
-class MessageFilterSimple;
-
-typedef std::shared_ptr <MessageFilterSimple> MessageFilterSimplePtr;
-typedef std::weak_ptr <MessageFilterSimple> MessageFilterSimpleWeakPtr;
-
-class ChannelSimple;
-
-typedef std::shared_ptr <ChannelSimple> ChannelSimplePtr;
-typedef std::weak_ptr <ChannelSimple> ChannelSimpleWeakPtr;
-
-class DeviceSimple;
-
-typedef std::shared_ptr <DeviceSimple> DeviceSimplePtr;
-typedef std::weak_ptr <DeviceSimple> DeviceSimpleWeakPtr;
-
-class LibrarySimple;
-
-typedef std::shared_ptr <LibrarySimple> LibrarySimplePtr;
-typedef std::weak_ptr <LibrarySimple> LibrarySimpleWeakPtr;
+DEFINE_SHARED(PeriodicMessageSimple)
+DEFINE_SHARED(MessageFilterSimple)
+DEFINE_SHARED(ChannelSimple)
+DEFINE_SHARED(DeviceSimple)
+DEFINE_SHARED(LibrarySimple)
 
 class J2534Exception : public std::exception {
 public:
@@ -52,11 +38,11 @@ public:
     virtual void close(const DevicePtr &devicePtr) override;
 
     virtual void getLastError(char *pErrorDescription) override;
-	
-	// New
+    
+    // New
 
     virtual j2534_fcts* getProxy() const;
-	
+    
 protected:
     virtual DevicePtr createDevice(void *pName, unsigned long deviceId);
 
@@ -65,6 +51,7 @@ protected:
 };
 
 class DeviceSimple : public Device {
+    friend class LibrarySimple;
 public:
     DeviceSimple(const LibrarySimplePtr &library, unsigned long deviceId);
 
@@ -81,11 +68,7 @@ public:
     virtual void ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
 
     virtual LibraryWeakPtr getLibrary() const override;
-	
-	// New
-
-    virtual LibrarySimpleWeakPtr getLibrarySimple() const;
-	
+    
 protected:
     virtual ChannelPtr createChannel(unsigned long ProtocolID, unsigned long Flags, unsigned long BaudRate, unsigned long channelId);
 
@@ -95,8 +78,7 @@ protected:
 };
 
 class ChannelSimple : public Channel {
-	friend class MessageFilterSimple;
-	friend class PeriodicMessageSimple;
+    friend class DeviceSimple;
 public:
     ChannelSimple(const DeviceSimplePtr &device, unsigned long channelId);
 
@@ -118,38 +100,36 @@ public:
     virtual void ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
 
     virtual DeviceWeakPtr getDevice() const override;
-	
-	// New
-
-    virtual DeviceSimpleWeakPtr getDeviceSimple() const;
-	
+    
 protected:
-	virtual MessageFilterPtr createMessageFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg, unsigned long messageFilterId);
-	virtual PeriodicMessagePtr createPeriodicMessage(PASSTHRU_MSG *pMsg, unsigned long TimeInterval, unsigned long periodicMessageId);
+    virtual MessageFilterPtr createMessageFilter(unsigned long FilterType, PASSTHRU_MSG *pMaskMsg, PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg, unsigned long messageFilterId);
+    virtual PeriodicMessagePtr createPeriodicMessage(PASSTHRU_MSG *pMsg, unsigned long TimeInterval, unsigned long periodicMessageId);
 
     DeviceSimpleWeakPtr mDevice;
-	std::list<MessageFilterPtr> mMessageFilters;
-	std::list<PeriodicMessagePtr> mPeriodicMessages;
+    std::list<MessageFilterPtr> mMessageFilters;
+    std::list<PeriodicMessagePtr> mPeriodicMessages;
     unsigned long mChannelId;
 };
 
 class MessageFilterSimple : public MessageFilter {
+    friend class ChannelSimple;
 public:
-	MessageFilterSimple(const ChannelSimplePtr& channel, unsigned long messageFilterId);
-	~MessageFilterSimple();
+    MessageFilterSimple(const ChannelSimplePtr& channel, unsigned long messageFilterId);
+    ~MessageFilterSimple();
 
-	virtual ChannelWeakPtr getChannel() const override;
+    virtual ChannelWeakPtr getChannel() const override;
 protected:
     ChannelSimpleWeakPtr mChannel;
     unsigned long mMessageFilterId;
 };
 
 class PeriodicMessageSimple : public PeriodicMessage {
+    friend class ChannelSimple;
 public:
-	PeriodicMessageSimple(const ChannelSimplePtr& channel, unsigned long periodicMessageId);
-	~PeriodicMessageSimple();
+    PeriodicMessageSimple(const ChannelSimplePtr& channel, unsigned long periodicMessageId);
+    ~PeriodicMessageSimple();
 
-	virtual ChannelWeakPtr getChannel() const override;
+    virtual ChannelWeakPtr getChannel() const override;
 protected:
     ChannelSimpleWeakPtr mChannel;
     unsigned long mPeriodicMessageId;

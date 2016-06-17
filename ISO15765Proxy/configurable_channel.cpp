@@ -208,14 +208,14 @@ ConfigurableChannel::ConfigurableChannel(unsigned long ProtocolID) {
 }
 
 Configuration &ConfigurableChannel::getConfiguration() {
-	return *mConfiguration;
+    return *mConfiguration;
 }
 
 std::unique_ptr<Configuration> ConfigurableChannel::createConfig(unsigned long ProtocolID) const {
-    if ((ProtocolID & 0x7FFF) == ISO15765) {
+    if (ProtocolID == ISO15765 || ProtocolID == ISO15765_PS) {
         return std::make_unique<ISO15765Config>();
     }
-    if ((ProtocolID & 0x7FFF) == CAN) {
+    if (ProtocolID == CAN || ProtocolID == CAN_PS) {
         return std::make_unique<CANConfig>();
     }
     return std::make_unique<DefaultConfig>();
@@ -226,7 +226,7 @@ ConfigurableChannel::~ConfigurableChannel() {
 }
 
 bool ConfigurableChannel::getConfigs(SCONFIG_LIST *list) const {
-	bool ret = false;
+    bool ret = false;
     if (list == NULL) {
         return ret;
     }
@@ -234,7 +234,7 @@ bool ConfigurableChannel::getConfigs(SCONFIG_LIST *list) const {
     for (unsigned long i = 0; i < list->NumOfParams; ++i) {
         ret |= getConfig(config++);
     }
-	return ret;
+    return ret;
 }
 
 bool ConfigurableChannel::getConfig(SCONFIG *config) const {
@@ -242,7 +242,7 @@ bool ConfigurableChannel::getConfig(SCONFIG *config) const {
 }
 
 bool ConfigurableChannel::setConfigs(SCONFIG_LIST *list) {
-	bool ret = false;
+    bool ret = false;
     if (list == NULL) {
         return ret;
     }
@@ -250,7 +250,7 @@ bool ConfigurableChannel::setConfigs(SCONFIG_LIST *list) {
     for (unsigned long i = 0; i < list->NumOfParams; ++i) {
         ret |= setConfig(config++);
     }
-	return ret;
+    return ret;
 }
 
 bool ConfigurableChannel::setConfig(SCONFIG *config) {
@@ -258,7 +258,7 @@ bool ConfigurableChannel::setConfig(SCONFIG *config) {
 }
 
 bool ConfigurableChannel::handle_ioctl(unsigned long IoctlID, void *pInput, void *pOutput) {
-	UNUSED(pOutput);
+    UNUSED(pOutput);
     switch (IoctlID) {
         case GET_CONFIG:
             return getConfigs(reinterpret_cast<SCONFIG_LIST *>(pInput));
@@ -273,7 +273,7 @@ bool ConfigurableChannel::handle_ioctl(unsigned long IoctlID, void *pInput, void
         case CLEAR_MSG_FILTERS:
             return clearMessageFilters();
     }
-	return false;
+    return false;
 }
 
 void ConfigurableChannel::ioctl(unsigned long IoctlID, void *pInput, void *pOutput) {

@@ -1,10 +1,10 @@
 #include "stdafx.h"
-#include "../gateway/gateway.h"
 #include "ISO15765Proxy.h"
 #include "log.h"
 #include "internal.h"
 #include "iso15765.h"
-#include <assert.h>
+#include "simple.h"
+#include "utils.h"
 
 LibraryPtr library;
 
@@ -18,7 +18,7 @@ void delete_library() {
 
 ///////////////////////////////////// PassThruFunctions /////////////////////////////////////////////////
 
-long J2534_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
+long ISO15765_PROXY_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
     LOG(INIT, "PassThruOpen");
 
     long ret = STATUS_NOERROR;
@@ -32,14 +32,14 @@ long J2534_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
     return ret;
 }
 
-long J2534_API PassThruClose(unsigned long DeviceID) {
+long ISO15765_PROXY_API PassThruClose(unsigned long DeviceID) {
     LOG(INIT, "PassThruClose");
 
     long ret = STATUS_NOERROR;
     try {
         Device *device = reinterpret_cast<Device *>(DeviceID);
         LibraryPtr library = device->getLibrary().lock();
-
+        
         assert(library);
 
         library->close(device->shared_from_this());
@@ -50,7 +50,7 @@ long J2534_API PassThruClose(unsigned long DeviceID) {
     return ret;
 }
 
-long J2534_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID, unsigned long Flags,
+long ISO15765_PROXY_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID, unsigned long Flags,
                                unsigned long Baudrate, unsigned long *pChannelID) {
     LOG(INIT, "PassThruConnect");
 
@@ -66,14 +66,14 @@ long J2534_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID,
     return ret;
 }
 
-long J2534_API PassThruDisconnect(unsigned long ChannelID) {
+long ISO15765_PROXY_API PassThruDisconnect(unsigned long ChannelID) {
     LOG(INIT, "PassThruDisconnect");
 
     long ret = STATUS_NOERROR;
     try {
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
         DevicePtr device = channel->getDevice().lock();
-
+        
         assert(device);
 
         device->disconnect(channel->shared_from_this());
@@ -85,7 +85,7 @@ long J2534_API PassThruDisconnect(unsigned long ChannelID) {
 }
 
 
-long J2534_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
+long ISO15765_PROXY_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
                                 unsigned long Timeout) {
     LOG(INIT, "PassThruReadMsgs");
 
@@ -102,7 +102,7 @@ long J2534_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, uns
 }
 
 
-long J2534_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
+long ISO15765_PROXY_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
                                  unsigned long Timeout) {
     LOG(INIT, "PassThruWriteMsgs");
 
@@ -119,7 +119,7 @@ long J2534_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, un
 }
 
 
-long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pMsgID,
+long ISO15765_PROXY_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pMsgID,
                                         unsigned long TimeInterval) {
     LOG(INIT, "PassThruStartPeriodicMsg");
 
@@ -128,7 +128,7 @@ long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *p
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
 
         PeriodicMessagePtr periodicMessage = channel->startPeriodicMsg(pMsg, TimeInterval);
-		*pMsgID = reinterpret_cast<unsigned long>(periodicMessage.get());
+        *pMsgID = reinterpret_cast<unsigned long>(periodicMessage.get());
     } catch (J2534Exception &exception) {
         ret = exception.code();
     }
@@ -137,13 +137,13 @@ long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *p
 }
 
 
-long J2534_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long MsgID) {
+long ISO15765_PROXY_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long MsgID) {
     LOG(INIT, "PassThruStopPeriodicMsg");
 
     long ret = STATUS_NOERROR;
     try {
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
-		PeriodicMessage *periodicMessage = reinterpret_cast<PeriodicMessage *>(MsgID);
+        PeriodicMessage *periodicMessage = reinterpret_cast<PeriodicMessage *>(MsgID);
 
         channel->stopPeriodicMsg(periodicMessage->shared_from_this());
     } catch (J2534Exception &exception) {
@@ -154,7 +154,7 @@ long J2534_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long Ms
 }
 
 
-long J2534_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long FilterType, PASSTHRU_MSG *pMaskMsg,
+long ISO15765_PROXY_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long FilterType, PASSTHRU_MSG *pMaskMsg,
                                       PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg,
                                       unsigned long *pFilterID) {
     LOG(INIT, "PassThruStartMsgFilter");
@@ -164,7 +164,7 @@ long J2534_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long Fil
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
 
         MessageFilterPtr messageFilter = channel->startMsgFilter(FilterType, pMaskMsg, pPatternMsg, pFlowControlMsg);
-		*pFilterID = reinterpret_cast<unsigned long>(messageFilter.get());
+        *pFilterID = reinterpret_cast<unsigned long>(messageFilter.get());
     } catch (J2534Exception &exception) {
         ret = exception.code();
     }
@@ -173,13 +173,13 @@ long J2534_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long Fil
 }
 
 
-long J2534_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long FilterID) {
+long ISO15765_PROXY_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long FilterID) {
     LOG(INIT, "PassThruStopMsgFilter");
 
     long ret = STATUS_NOERROR;
     try {
         Channel *channel = reinterpret_cast<Channel *>(ChannelID);
-		MessageFilter *messageFilter = reinterpret_cast<MessageFilter *>(FilterID);
+        MessageFilter *messageFilter = reinterpret_cast<MessageFilter *>(FilterID);
 
         channel->stopMsgFilter(messageFilter->shared_from_this());
     } catch (J2534Exception &exception) {
@@ -190,7 +190,7 @@ long J2534_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long Filt
 }
 
 
-long J2534_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned long PinNumber, unsigned long Voltage) {
+long ISO15765_PROXY_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned long PinNumber, unsigned long Voltage) {
     LOG(INIT, "PassThruSetProgrammingVoltage");
 
     long ret = STATUS_NOERROR;
@@ -206,7 +206,7 @@ long J2534_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned lo
 }
 
 
-long J2534_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersion, char *pDllVersion,
+long ISO15765_PROXY_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersion, char *pDllVersion,
                                    char *pApiVersion) {
     LOG(INIT, "PassThruReadVersion");
 
@@ -223,7 +223,7 @@ long J2534_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersio
 }
 
 
-long J2534_API PassThruGetLastError(char *pErrorDescription) {
+long ISO15765_PROXY_API PassThruGetLastError(char *pErrorDescription) {
     LOG(INIT, "PassThruGetLastError");
 
     long ret = STATUS_NOERROR;
@@ -238,7 +238,7 @@ long J2534_API PassThruGetLastError(char *pErrorDescription) {
 }
 
 
-long J2534_API PassThruIoctl(unsigned long ChannelID, unsigned long IoctlID, void *pInput, void *pOutput) {
+long ISO15765_PROXY_API PassThruIoctl(unsigned long ChannelID, unsigned long IoctlID, void *pInput, void *pOutput) {
     LOG(INIT, "PassThruIoctl");
 
     long ret = STATUS_NOERROR;

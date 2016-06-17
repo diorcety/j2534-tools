@@ -5,58 +5,38 @@
 
 #include "internal.h"
 #include "configurable_channel.h"
-#include "simple.h"
+#include <list>
 
-class ISO15765Transfer;
-
-typedef std::shared_ptr <ISO15765Transfer> ISO15765TransferPtr;
-typedef std::weak_ptr <ISO15765Transfer> ISO15765TransferWeakPtr;
-
-class MessageFilterISO15765;
-
-typedef std::shared_ptr <MessageFilterISO15765> MessageFilterISO15765Ptr;
-typedef std::weak_ptr <MessageFilterISO15765> MessageFilterISO15765WeakPtr;
-
-class ChannelISO15765;
-
-typedef std::shared_ptr <ChannelISO15765> ChannelISO15765Ptr;
-typedef std::weak_ptr <ChannelISO15765> ChannelISO15765WeakPtr;
-
-class DeviceISO15765;
-
-typedef std::shared_ptr <DeviceISO15765> DeviceISO15765Ptr;
-typedef std::weak_ptr <DeviceISO15765> DeviceISO15765WeakPtr;
-
-class LibraryISO15765;
-
-typedef std::shared_ptr <LibraryISO15765> LibraryISO15765Ptr;
-typedef std::weak_ptr <LibraryISO15765> LibraryISO15765WeakPtr;
-
+DEFINE_SHARED(TransferISO15765)
+DEFINE_SHARED(MessageFilterISO15765)
+DEFINE_SHARED(ChannelISO15765)
+DEFINE_SHARED(DeviceISO15765)
+DEFINE_SHARED(LibraryISO15765)
 
 class LibraryISO15765: public Library {
 public:
     LibraryISO15765(const LibraryPtr &library);
-	
-	virtual ~LibraryISO15765();
-	
+    
+    virtual ~LibraryISO15765();
+    
     virtual DevicePtr open(void *pName) override;
 
     virtual void close(const DevicePtr &devicePtr) override;
 
     virtual void getLastError(char *pErrorDescription) override;
-	
+
 protected:
-    LibraryPtr mLibrary;
     std::list<DevicePtr> mDevices;
+    LibraryPtr mLibrary;
 };
 
 class DeviceISO15765: public Device {
-	friend class LibraryISO15765;
+    friend class LibraryISO15765;
 public:
     DeviceISO15765(const LibraryISO15765Ptr &library, const DevicePtr &device);
-	
-	virtual ~DeviceISO15765();
-	
+    
+    virtual ~DeviceISO15765();
+    
     virtual ChannelPtr connect(unsigned long ProtocolID, unsigned long Flags, unsigned long BaudRate) override;
 
     virtual void disconnect(const ChannelPtr &channelPtr) override;
@@ -68,17 +48,18 @@ public:
     virtual void ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
 
     virtual LibraryWeakPtr getLibrary() const override;
-	
+    
 protected:
-    LibraryISO15765Ptr mLibrary;
+    LibraryISO15765WeakPtr mLibrary;
     std::list<ChannelPtr> mChannels;
-	DevicePtr mDevice;
+    DevicePtr mDevice;
 };
 
 class ChannelISO15765: public ConfigurableChannel {
-	friend class ISO15765Transfer;
+    friend class TransferISO15765;
+    friend class DeviceISO15765;
 public:
-    ChannelISO15765(const DeviceISO15765Ptr &device, const ChannelPtr &channel);
+    ChannelISO15765(unsigned long protocolId, const DeviceISO15765Ptr &device, const ChannelPtr &channel);
 
     virtual ~ChannelISO15765();
     
@@ -101,7 +82,7 @@ protected:
     virtual bool getConfig(SCONFIG *config) const override;
 
     virtual bool setConfig(SCONFIG *config) override;
-	
+    
     virtual bool clearTxBuffers() override;
 
     virtual bool clearRxBuffers() override;
@@ -109,22 +90,26 @@ protected:
     virtual bool clearPeriodicMessages() override;
 
     virtual bool clearMessageFilters() override;
-	
-    virtual bool handle_ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
-	
-protected:
-    DeviceISO15765Ptr mDevice;
-    ChannelPtr mChannel;
-	std::list<MessageFilterISO15765Ptr> mMessageFilters;
     
-    std::shared_ptr<ISO15765Transfer> getTransferByFlowControl(const PASSTHRU_MSG &msg);
-    std::shared_ptr<ISO15765Transfer> getTransferByPattern(const PASSTHRU_MSG &msg);
+    virtual bool handle_ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
+    
+    virtual void ioctl(unsigned long IoctlID, void *pInput, void *pOutput) override;
+    
+    TransferISO15765Ptr getTransferByFlowControl(const PASSTHRU_MSG &msg);
+    
+    TransferISO15765Ptr getTransferByPattern(const PASSTHRU_MSG &msg);
+    
+protected:
+    unsigned long mProtocolId;
+    DeviceISO15765WeakPtr mDevice;
+    std::list<MessageFilterPtr> mMessageFilters;
+    ChannelPtr mChannel;
 };
  
-class ISO15765Transfer {
+class TransferISO15765 {
 public:
-    ISO15765Transfer(Configuration &configuration, Channel &channel, const PASSTHRU_MSG &pMaskMsg, const PASSTHRU_MSG &pPatternMsg, const PASSTHRU_MSG &pFlowControlMsg);
-    ~ISO15765Transfer();
+    TransferISO15765(Configuration &configuration, Channel &channel, const PASSTHRU_MSG &pMaskMsg, const PASSTHRU_MSG &pPatternMsg, const PASSTHRU_MSG &pFlowControlMsg);
+    ~TransferISO15765();
     
     void clear();
     
@@ -159,16 +144,16 @@ private:
     
     bool sendFlowControlMessage(unsigned long Timeout);
 
-	Configuration &mChannelConfiguration;
+    Configuration &mChannelConfiguration;
     Channel &mChannel;
-	
+    
     uint32_t mMaskPid;
     uint32_t mPatternPid;
     uint32_t mFlowControlPid;
-	
-	unsigned long mBs;
-	unsigned long mStmin;
-	
+    
+    unsigned long mBs;
+    unsigned long mStmin;
+    
     unsigned int mSequence;
     PASSTHRU_MSG mMessage;
     TransferState mState;
@@ -176,18 +161,19 @@ private:
 };
 
 class MessageFilterISO15765: public MessageFilter {
+    friend class ChannelISO15765;
 public:
-    MessageFilterISO15765(const ChannelISO15765Ptr &channel, const MessageFilterPtr &messageFilter, const ISO15765TransferPtr &transfer);
-	virtual ~MessageFilterISO15765();
-	
-	virtual ChannelWeakPtr getChannel() const override;
-	
-	virtual ISO15765TransferPtr& getTransfer();
-	
+    MessageFilterISO15765(const ChannelISO15765Ptr &channel, const MessageFilterPtr &messageFilter, const TransferISO15765Ptr &transfer);
+    virtual ~MessageFilterISO15765();
+    
+    virtual ChannelWeakPtr getChannel() const override;
+    
+    virtual TransferISO15765Ptr& getTransfer();
+    
 private:
     ChannelISO15765WeakPtr mChannel;
+    TransferISO15765Ptr mTransfer;
     MessageFilterPtr mMessageFilter;
-    ISO15765TransferPtr mTransfer;
 };
 
 #endif //__ISO15765_H

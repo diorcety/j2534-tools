@@ -2,6 +2,8 @@
 #include "../gateway/gateway.h"
 #include "MVCIProxy.h"
 #include "log.h"
+#include <stdlib.h>
+#include <string.h>
 
 static j2534_fcts *last_ret_proxy = NULL;
 
@@ -37,7 +39,12 @@ public:
 };
 
 static unsigned long filterProtocol(unsigned long protocol) {
-    return protocol & 0x7FFF;
+    if(protocol == CAN_PS) {
+        return CAN;
+    } else if (protocol == ISO15765_PS) {
+        return ISO15765;
+    }
+    return protocol;
 }
 
 static PASSTHRU_MSG* filterPS(const PASSTHRU_MSG *msg) {
@@ -65,7 +72,7 @@ static PASSTHRU_MSG* filterPSs(const PASSTHRU_MSG *msg, unsigned long count) {
 
 ///////////////////////////////////// PassThruFunctions /////////////////////////////////////////////////
 
-long J2534_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
+long MVCI_PROXY_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
     LOG(INIT, "PassThruOpen");
 
     long ret;
@@ -94,7 +101,7 @@ long J2534_API PassThruOpen(void *pName, unsigned long *pDeviceID) {
     return ret;
 }
 
-long J2534_API PassThruClose(unsigned long DeviceID) {
+long MVCI_PROXY_API PassThruClose(unsigned long DeviceID) {
     LOG(INIT, "PassThruClose");
     Devices *devices = reinterpret_cast<Devices *>(DeviceID);
 
@@ -114,7 +121,7 @@ long J2534_API PassThruClose(unsigned long DeviceID) {
     return ret;
 }
 
-long J2534_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID, unsigned long Flags,
+long MVCI_PROXY_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID, unsigned long Flags,
                                unsigned long Baudrate, unsigned long *pChannelID) {
     LOG(INIT, "PassThruConnect");
     Devices *devices = reinterpret_cast<Devices *> (DeviceID);
@@ -140,7 +147,7 @@ long J2534_API PassThruConnect(unsigned long DeviceID, unsigned long ProtocolID,
     return ret;
 }
 
-long J2534_API PassThruDisconnect(unsigned long ChannelID) {
+long MVCI_PROXY_API PassThruDisconnect(unsigned long ChannelID) {
     LOG(INIT, "PassThruDisconnect");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
     Device *device = channel->device;
@@ -154,7 +161,7 @@ long J2534_API PassThruDisconnect(unsigned long ChannelID) {
 }
 
 
-long J2534_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
+long MVCI_PROXY_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
                                 unsigned long Timeout) {
     LOG(INIT, "PassThruReadMsgs");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
@@ -168,7 +175,7 @@ long J2534_API PassThruReadMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, uns
 }
 
 
-long J2534_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
+long MVCI_PROXY_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs,
                                  unsigned long Timeout) {
     LOG(INIT, "PassThruWriteMsgs");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
@@ -190,7 +197,7 @@ long J2534_API PassThruWriteMsgs(unsigned long ChannelID, PASSTHRU_MSG *pMsg, un
 }
 
 
-long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pMsgID,
+long MVCI_PROXY_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *pMsg, unsigned long *pMsgID,
                                         unsigned long TimeInterval) {
     LOG(INIT, "PassThruStartPeriodicMsg");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
@@ -212,7 +219,7 @@ long J2534_API PassThruStartPeriodicMsg(unsigned long ChannelID, PASSTHRU_MSG *p
 }
 
 
-long J2534_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long MsgID) {
+long MVCI_PROXY_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long MsgID) {
     LOG(INIT, "PassThruStopPeriodicMsg");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
     Device *device = channel->device;
@@ -225,7 +232,7 @@ long J2534_API PassThruStopPeriodicMsg(unsigned long ChannelID, unsigned long Ms
 }
 
 
-long J2534_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long FilterType, PASSTHRU_MSG *pMaskMsg,
+long MVCI_PROXY_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long FilterType, PASSTHRU_MSG *pMaskMsg,
                                       PASSTHRU_MSG *pPatternMsg, PASSTHRU_MSG *pFlowControlMsg,
                                       unsigned long *pFilterID) {
     LOG(INIT, "PassThruStartMsgFilter");
@@ -256,7 +263,7 @@ long J2534_API PassThruStartMsgFilter(unsigned long ChannelID, unsigned long Fil
 }
 
 
-long J2534_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long FilterID) {
+long MVCI_PROXY_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long FilterID) {
     LOG(INIT, "PassThruStopMsgFilter");
     Channel *channel = reinterpret_cast<Channel *> (ChannelID);
     Device *device = channel->device;
@@ -269,7 +276,7 @@ long J2534_API PassThruStopMsgFilter(unsigned long ChannelID, unsigned long Filt
 }
 
 
-long J2534_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned long PinNumber, unsigned long Voltage) {
+long MVCI_PROXY_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned long PinNumber, unsigned long Voltage) {
     LOG(INIT, "PassThruSetProgrammingVoltage");
     Devices *devices = reinterpret_cast<Devices *>(DeviceID);
     DeviceID = devices->device1->deviceId;
@@ -280,7 +287,7 @@ long J2534_API PassThruSetProgrammingVoltage(unsigned long DeviceID, unsigned lo
 }
 
 
-long J2534_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersion, char *pDllVersion,
+long MVCI_PROXY_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersion, char *pDllVersion,
                                    char *pApiVersion) {
     LOG(INIT, "PassThruReadVersion");
     Devices *devices = reinterpret_cast<Devices *>(DeviceID);
@@ -292,7 +299,7 @@ long J2534_API PassThruReadVersion(unsigned long DeviceID, char *pFirmwareVersio
 }
 
 
-long J2534_API PassThruGetLastError(char *pErrorDescription) {
+long MVCI_PROXY_API PassThruGetLastError(char *pErrorDescription) {
     LOG(INIT, "PassThruGetLastError");
     if (last_ret_proxy != NULL) {
         return last_ret_proxy->passThruGetLastError(pErrorDescription);
@@ -301,7 +308,7 @@ long J2534_API PassThruGetLastError(char *pErrorDescription) {
 }
 
 
-long J2534_API PassThruIoctl(unsigned long ChannelID, unsigned long IoctlID, void *pInput, void *pOutput) {
+long MVCI_PROXY_API PassThruIoctl(unsigned long ChannelID, unsigned long IoctlID, void *pInput, void *pOutput) {
     LOG(INIT, "PassThruIoctl");
     if(IoctlID == READ_PROG_VOLTAGE || IoctlID == READ_VBATT) {
         Devices *devices = reinterpret_cast<Devices *> (ChannelID);

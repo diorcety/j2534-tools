@@ -18,7 +18,6 @@ pGetDeviceToOpen GetDeviceToOpen;
 }
 
 bool setup(HMODULE hModule) {
-    LOG_START();
     LOG(INIT, "Setup");
     char fullpathname[1024];
     char libname[1024];
@@ -86,12 +85,12 @@ void exitdll() {
     FreeLibrary(proxy_handle);
 
     FreeLibrary(gateway_handle);
-    LOG_STOP();
 }
 
 BOOL APIENTRY
 DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     UNUSED(lpReserved);
+    LOG_START();
     LOG(INIT, "FTDI Proxy");
     LOG(INIT, "DllMain: %d", ul_reason_for_call);
 
@@ -110,6 +109,7 @@ DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
         case
             DLL_PROCESS_DETACH:
             exitdll();
+            LOG_STOP();
             break;
     }
     return TRUE;
