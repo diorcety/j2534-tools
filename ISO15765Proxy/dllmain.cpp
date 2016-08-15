@@ -142,6 +142,7 @@ void exitdll() {
 BOOL APIENTRY
 DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     UNUSED(lpReserved);
+    LOG_START();
     LOG(INIT, "ISO15765 Proxy");
     LOG(INIT, "DllMain: %d", ul_reason_for_call);
 

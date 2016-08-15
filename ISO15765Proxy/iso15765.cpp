@@ -180,7 +180,7 @@ void TransferISO15765::prepareSentMessageHeaders(PASSTHRU_MSG &out_msg, const PA
 
 void TransferISO15765::prepareReceivedMessageHeaders(PASSTHRU_MSG &out_msg, const PASSTHRU_MSG &in_msg) {
     out_msg.ProtocolID = ISO15765;
-    out_msg.RxStatus = in_msg.RxStatus;
+    out_msg.RxStatus = 0;
     out_msg.TxFlags = 0;
     out_msg.Timestamp = 0;
     out_msg.DataSize = 0;
@@ -203,139 +203,143 @@ bool TransferISO15765::writeMsg(const PASSTHRU_MSG &msg, unsigned long Timeout) 
     // Set Deadline
     std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
     
-    // Sanity checks
-    if(msg.DataSize < J2534_DATA_OFFSET) {
-        LOG_DEBUG("Invalid size");
-        goto fail;
-    }
-    
-    if(mState != START_STATE) {
-        LOG_DEBUG("Wrong state");
-        goto fail;
-    }
-    
-    while(msg.DataSize > (size_t)mOffset) {
-        Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
-        if(Timeout <= 0) {
-            return false;
+    try {
+        // Sanity checks
+        if(msg.DataSize < J2534_DATA_OFFSET) {
+            LOG_DEBUG("Invalid size");
+            goto fail;
         }
         
-        if(mState == START_STATE) {
-            mOffset = J2534_DATA_OFFSET;
-            prepareSentMessageHeaders(tmp_msg, msg);
-            
-            // Compute
-            PCIFrameName frameName = SingleFrame;
-            size_t size = getRemainingSize(msg, mOffset);
-            
-            if(size < (msg.DataSize - mOffset)) {
-                frameName = FirstFrame;
-            }
-            
-            // Fill the buffer
-            if(frameName == FirstFrame) {
-                size_t fullsize = msg.DataSize - mOffset;
-                tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| ((fullsize >> 8) & 0x0F);
-                tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE] = (fullsize & 0xFF);
-                size = CAN_DATA_SIZE - J2534_PCI_SIZE - J2534_LENGTH_SIZE;
-                mSequence++;
-                tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_LENGTH_SIZE + size;
-                memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_LENGTH_SIZE]), &(msg.Data[mOffset]), size);
-            } else {
-                tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| (size & 0x0F);
-                tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + size;
-                memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE]), &(msg.Data[mOffset]), size);
-            }
-            
-            mOffset += size;
-            
-            // Padding
-            if(msg.TxFlags & ISO15765_FRAME_PAD) {
-                paddingMessage(tmp_msg);
-            }
-            
-            unsigned long count = 1;
-            mChannel.writeMsgs(&tmp_msg, &count, Timeout);
-            if(count != 1) {
-                LOG_DEBUG("Can't write message %d", frameName);
-                goto fail;
-            }
-            mState = FLOW_CONTROL_STATE;
-        } else if (mState == FLOW_CONTROL_STATE) {
-            unsigned long count = 1;
-            mChannel.readMsgs(&tmp_msg, &count, Timeout);
-            if(count != 1) {
-                LOG_DEBUG("Can't read flow control message");
-                goto fail;
-            }
-            if(tmp_msg.DataSize < J2534_DATA_OFFSET) {
-                LOG_DEBUG("Invalid flow control message size");
-                goto fail;
-            }
-            if((data2pid(tmp_msg.Data) & mMaskPid) != mPatternPid) {
-                LOG_DEBUG("Incorrect PID");
-                goto fail;
-            }
-            PCIFrameName frameName = getFrameName(tmp_msg.Data[J2534_DATA_OFFSET]);
-            if(frameName != FlowControl) {
-                LOG_DEBUG("Invalid frame type %d (Need %d)", frameName, FlowControl);
-                goto fail;
-            }
-            
-            // Get block information
-            mBs = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE];
-            mStmin = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_BS_SIZE];
-            
-            std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
-            
-            mState = BLOCK_STATE;
-        } else if (mState == BLOCK_STATE) {
-            prepareSentMessageHeaders(tmp_msg, msg);
-            
-            // Compute
-            PCIFrameName frameName = ConsecutiveFrame;
-            size_t size = getRemainingSize(msg, mOffset);
-            
-            // Fill the buffer
-            tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| ((mSequence++) & 0x0F);
-            tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + size;
-            memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE]), &(msg.Data[mOffset]), size);
-            
-            mOffset += size;
-            
-            // Padding
-            if(msg.TxFlags & ISO15765_FRAME_PAD) {
-                paddingMessage(tmp_msg);
-            }
-            
-            // Write the message
-            unsigned long count = 1;
-            mChannel.writeMsgs(&tmp_msg, &count, Timeout);
-            if(count != 1) {
-                LOG_DEBUG("Can't write message");
-                goto fail;
-            }
-            
-            // End of the block ?
-            if(--mBs == 0) {
-                mState = FLOW_CONTROL_STATE;
-            }
-            
-            if(mState == BLOCK_STATE) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
-            }
-        } else {
+        if(mState != START_STATE) {
             LOG_DEBUG("Wrong state");
             goto fail;
         }
+    
+        while(msg.DataSize > (size_t)mOffset) {
+            Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
+            if(Timeout <= 0) {
+                goto fail;
+            }
+            
+            if(mState == START_STATE) {
+                mOffset = J2534_DATA_OFFSET;
+                prepareSentMessageHeaders(tmp_msg, msg);
+                
+                // Compute
+                PCIFrameName frameName = SingleFrame;
+                size_t size = getRemainingSize(msg, mOffset);
+                
+                if(size < (msg.DataSize - mOffset)) {
+                    frameName = FirstFrame;
+                }
+                
+                // Fill the buffer
+                if(frameName == FirstFrame) {
+                    size_t fullsize = msg.DataSize - mOffset;
+                    tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| ((fullsize >> 8) & 0x0F);
+                    tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE] = (fullsize & 0xFF);
+                    size = CAN_DATA_SIZE - J2534_PCI_SIZE - J2534_LENGTH_SIZE;
+                    mSequence++;
+                    tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_LENGTH_SIZE + size;
+                    memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_LENGTH_SIZE]), &(msg.Data[mOffset]), size);
+                } else {
+                    tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| (size & 0x0F);
+                    tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + size;
+                    memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE]), &(msg.Data[mOffset]), size);
+                }
+                
+                mOffset += size;
+                
+                // Padding
+                if(msg.TxFlags & ISO15765_FRAME_PAD) {
+                    paddingMessage(tmp_msg);
+                }
+                
+                unsigned long count = 1;
+                mChannel.writeMsgs(&tmp_msg, &count, Timeout);
+                if(count != 1) {
+                    LOG_DEBUG("Can't write message %d", frameName);
+                    goto fail;
+                }
+                mState = FLOW_CONTROL_STATE;
+            } else if (mState == FLOW_CONTROL_STATE) {
+                unsigned long count = 1;
+                mChannel.readMsgs(&tmp_msg, &count, Timeout);
+                if(count != 1) {
+                    LOG_DEBUG("Can't read flow control message");
+                    goto fail;
+                }
+                if(tmp_msg.DataSize < J2534_DATA_OFFSET) {
+                    LOG_DEBUG("Invalid flow control message size");
+                    goto fail;
+                }
+                if((data2pid(tmp_msg.Data) & mMaskPid) != mPatternPid) {
+                    LOG_DEBUG("Incorrect PID");
+                    goto fail;
+                }
+                PCIFrameName frameName = getFrameName(tmp_msg.Data[J2534_DATA_OFFSET]);
+                if(frameName != FlowControl) {
+                    LOG_DEBUG("Invalid frame type %d (Need %d)", frameName, FlowControl);
+                    goto fail;
+                }
+                
+                // Get block information
+                mBs = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE];
+                mStmin = tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE + J2534_BS_SIZE];
+                
+                std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
+                
+                mState = BLOCK_STATE;
+            } else if (mState == BLOCK_STATE) {
+                prepareSentMessageHeaders(tmp_msg, msg);
+                
+                // Compute
+                PCIFrameName frameName = ConsecutiveFrame;
+                size_t size = getRemainingSize(msg, mOffset);
+                
+                // Fill the buffer
+                tmp_msg.Data[J2534_DATA_OFFSET] = (getPci(frameName) & 0xF0)| ((mSequence++) & 0x0F);
+                tmp_msg.DataSize = J2534_DATA_OFFSET + J2534_PCI_SIZE + size;
+                memcpy(&(tmp_msg.Data[J2534_DATA_OFFSET + J2534_PCI_SIZE]), &(msg.Data[mOffset]), size);
+                
+                mOffset += size;
+                
+                // Padding
+                if(msg.TxFlags & ISO15765_FRAME_PAD) {
+                    paddingMessage(tmp_msg);
+                }
+                
+                // Write the message
+                unsigned long count = 1;
+                mChannel.writeMsgs(&tmp_msg, &count, Timeout);
+                if(count != 1) {
+                    LOG_DEBUG("Can't write message");
+                    goto fail;
+                }
+                
+                // End of the block ?
+                if(--mBs == 0) {
+                    mState = FLOW_CONTROL_STATE;
+                }
+                
+                if(mState == BLOCK_STATE) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(mStmin));
+                }
+            } else {
+                LOG_DEBUG("Wrong state");
+                goto fail;
+            }
+        }
+        
+        clear();
+        return true;
+    fail:
+        clear();
+        return false;
+    } catch(std::exception &ex) {
+        clear();
+        throw;
     }
-    
-    clear();
-    return true;
-    
-fail:
-    clear();
-    return false;
 }
 
 bool TransferISO15765::readMsg(const PASSTHRU_MSG &in_msg, PASSTHRU_MSG &out_msg, unsigned long Timeout) {
@@ -525,44 +529,46 @@ void ChannelISO15765::stopMsgFilter(const MessageFilterPtr &messageFilter) {
 void ChannelISO15765::readMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) {
     if (IS_ISO15765(mProtocolId)) {
         unsigned long count = 0;
-        
-        PASSTHRU_MSG readMsg;
-        
-        std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
-        for(unsigned long i = 0; i < *pNumMsgs; ++i) {
-            while(true) {                
-                {
-                    unsigned long c = 1;
-                    mChannel->readMsgs(&readMsg, &c, Timeout);
-                    if (c != 1) {
-                        LOG_DEBUG("Can't read msg");
+        try {            
+            PASSTHRU_MSG readMsg;
+            
+            std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
+            for(unsigned long i = 0; i < *pNumMsgs; ++i) {
+                while(true) {                
+                    {
+                        unsigned long c = 1;
+                        mChannel->readMsgs(&readMsg, &c, Timeout);
+                        if (c != 1) {
+                            LOG_DEBUG("Can't read msg");
+                            goto end;
+                        }
+                    }
+
+                    // Get transfer
+                    auto transfer = getTransferByPattern(readMsg);
+                    if (transfer) {
+                        if(transfer->readMsg(readMsg, *pMsg, Timeout)) {
+                            count++;
+                            pMsg++;
+                            break;
+                        }
+                    } else {
+                        LOG_DEBUG("No matching transfer");
+                    }
+                    
+                    Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
+                    if(Timeout <= 0) {
+                        LOG_DEBUG("Timeout");
                         goto end;
                     }
                 }
-                
-                Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
-
-                // Get transfer
-                auto transfer = getTransferByPattern(readMsg);
-                if (transfer) {
-                    if(transfer->readMsg(readMsg, *pMsg, Timeout)) {
-                        count++;
-                        break;
-                    }
-                } else {
-                    LOG_DEBUG("No matching transfer");
-                }
-                
-                Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
-                if(Timeout <= 0) {
-                    LOG_DEBUG("Timeout");
-                    goto end;
-                }
-            }
-        };
-        
+            };
 end:
-        *pNumMsgs = count;
+            *pNumMsgs = count;
+        } catch(std::exception &ex) {
+            *pNumMsgs = count;
+            throw;
+        }
     } else {
         mChannel->readMsgs(pMsg, pNumMsgs, Timeout);
     }
@@ -571,29 +577,32 @@ end:
 void ChannelISO15765::writeMsgs(PASSTHRU_MSG *pMsg, unsigned long *pNumMsgs, unsigned long Timeout) {
     if (IS_ISO15765(mProtocolId)) {
         unsigned long count = 0;
-        
-        std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
-        for(unsigned long i = 0; i < *pNumMsgs; ++i) {            
-            PASSTHRU_MSG &msg = *(pMsg++);
-            auto transfer = getTransferByFlowControl(msg);
-            if (transfer) {
-                if(transfer->writeMsg(msg, Timeout)) {
-                    count++;
+        try {            
+            std::chrono::time_point<std::chrono::steady_clock> deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(Timeout);
+            for(unsigned long i = 0; i < *pNumMsgs; ++i) {            
+                PASSTHRU_MSG &msg = *(pMsg++);
+                auto transfer = getTransferByFlowControl(msg);
+                if (transfer) {
+                    if(transfer->writeMsg(msg, Timeout)) {
+                        count++;
+                    } else {
+                        LOG_DEBUG("Can't write msg");
+                    }
                 } else {
-                    LOG_DEBUG("Can't write msg");
+                    LOG_DEBUG("Ignore msg");
                 }
-            } else {
-                LOG_DEBUG("Ignore msg");
-            }
-            
-            Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
-            if(Timeout <= 0) {
-                goto end;
-            }
-        };
-        
+                
+                Timeout = (std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())).count();
+                if(Timeout <= 0) {
+                    goto end;
+                }
+            };
 end:
-        *pNumMsgs = count;
+            *pNumMsgs = count;
+        } catch(std::exception &ex) {
+            *pNumMsgs = count;
+            throw;
+        }
     } else {
         mChannel->writeMsgs(pMsg, pNumMsgs, Timeout);
     }

@@ -133,7 +133,6 @@ bool setup(HMODULE hModule) {
 #endif //_WIN32
 #ifdef __linux__
 bool setup(Dl_info *info) {
-    LOG_START();
     LOG(INIT, "Setup");
     char fullpathname[1024];
     char libname[1024];
